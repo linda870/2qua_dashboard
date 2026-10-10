@@ -493,7 +493,7 @@ function renderEventsFull() {
       '<span class="event-title">' + (e.event_type || 'event').replace(/_/g, ' ') + '</span>' +
       '<span class="conf-tag ' + e.confidence + '">' + e.confidence + '</span>' +
       '</div>' +
-      '<div class="event-dates">' + (e.start_date ? e.start_date + ' → ' + (e.end_date || '?') : 'Recovered by ' + (e.end_date || '?')) + '</div>' +
+      '<div class="event-dates">' + (e.start_date ? e.start_date + ' → ' + (e.end_date || '?') : 'Low point on ' + (e.end_date || '?')) + '</div>' +
       '<div class="event-desc">' + (e.description || '') + '</div>' +
       deltaHTML;
     target.appendChild(card);
