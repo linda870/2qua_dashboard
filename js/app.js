@@ -88,8 +88,9 @@ const RESERVOIR_INDICATORS = {
   ALQUEVA: ['surface_area'],
 };
 
-const CHLA_STOPS = ['#1a9850', '#66bd63', '#fee08b', '#fdae61', '#f46d43', '#d73027', '#7f0000'];
-const SD_STOPS = ['#543005', '#8c510a', '#dfc27d', '#c7eae5', '#80cdc1', '#35978f', '#01665e'];
+// Same palettes and ranges as the published maps (Lauriuchi et al. 2026); must match colorize_geotiffs.py
+const CHLA_STOPS = ['#000000', '#6a0dad', '#1010ff', '#00d5ff', '#10d010', '#f5e600', '#ff8c00', '#ff0000'];   // 0-28 µg/L
+const SD_STOPS = ['#ff0000', '#ff8000', '#ffee00', '#10d010', '#00e5ff', '#1a1aff', '#0000c8'];   // 0-3 m
 
 /* ============================== STATE ============================== */
 const state = {
@@ -184,6 +185,9 @@ function renderImageOverlay() {
   let bestGap = Infinity;
   dates.forEach(d => { const gap = Math.abs(new Date(d) - new Date(target)); if (gap < bestGap) { bestGap = gap; nearest = d; } });
 
+  // Snap the slider and its label to the real image date, so the date shown always matches the map shown.
+  if (nearest !== target) snapSliderTo(nearest);
+
   const imgKey = key + '|' + nearest;
   const url = state.spatialImages[imgKey];
   if (!url) { note.style.display = 'block'; note.textContent = 'Image missing for ' + nearest; return; }
@@ -192,8 +196,7 @@ function renderImageOverlay() {
   const bounds = SPATIAL_EXPORT_BOUNDS[state.reservoir];
   imageOverlay = L.imageOverlay(url, bounds, { opacity: 0.85 }).addTo(map);
   note.style.display = 'block';
-  note.textContent = 'Showing ' + INDICATOR_META[state.mapLayer].label + ' — ' + nearest +
-    (nearest !== target ? ' (nearest available to ' + target + ')' : '');
+  note.textContent = 'Showing ' + INDICATOR_META[state.mapLayer].label + ' — image of ' + nearest;
 }
 
 function refreshMap(recenter) {
@@ -212,7 +215,7 @@ function renderLegend() {
   document.getElementById('legend-title').textContent = isChla ? 'Chlorophyll-a (µg/L)' : 'Secchi Depth (m)';
   const stops = isChla ? CHLA_STOPS : SD_STOPS;
   document.getElementById('legend-gradient').style.background = 'linear-gradient(90deg,' + stops.join(',') + ')';
-  const labels = isChla ? ['0', '15', '30', '60+'] : ['0 (turbid)', '2', '5', '8 (clear)'];
+  const labels = isChla ? ['0', '7', '14', '21', '28+'] : ['0 (turbid)', '1', '2', '3+ (clear)'];
   document.getElementById('legend-labels').innerHTML = labels.map(l => '<span>' + l + '</span>').join('');
 }
 
@@ -626,6 +629,16 @@ function setupDateSlider() {
   updateDateLabel();
 }
 
+function snapSliderTo(dateStr) {
+  const slider = document.getElementById('date-slider');
+  if (!state._rangeMin) return;
+  let days = Math.round((new Date(dateStr) - new Date(state._rangeMin)) / 86400000);
+  days = Math.max(0, Math.min(parseInt(slider.max, 10), days));
+  slider.value = days;
+  state.selectedDate = dateStr;
+  updateDateLabel();
+}
+
 function updateDateLabel() {
   document.getElementById('date-label').textContent = state.selectedDate || '—';
 }
@@ -644,6 +657,13 @@ document.getElementById('play-btn').addEventListener('click', () => {
   document.getElementById('play-btn').textContent = state.playing ? '⏸' : '▶';
   if (state.playing) {
     state.playTimer = setInterval(() => {
+      // with a map layer on, play steps through the real image dates
+      const imgDates = state.mapLayer !== 'none' ? (state.spatialDatesByKey[state.reservoir + '|' + state.mapLayer] || []) : [];
+      if (imgDates.length) {
+        snapSliderTo(imgDates.find(d => d > state.selectedDate) || imgDates[0]);
+        renderImageOverlay();
+        return;
+      }
       const slider = document.getElementById('date-slider');
       let v = parseInt(slider.value, 10) + Math.max(1, Math.round(slider.max / 100));
       if (v > slider.max) v = 0;
